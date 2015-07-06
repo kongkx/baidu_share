@@ -1,0 +1,26 @@
+<?php
+
+/**
+ * @file
+ * Enable and uninstall functions for the Baidu Share Button module.
+ */
+
+/**
+ * Implements hook_enable().
+ */
+function baidu_share_enable() {
+    
+}
+
+
+/**
+ * Implements hook_uninstall().
+ */
+function baidu_share_uninstall() {
+  variable_del('baidu_share_global_settings');
+  variable_del('baidu_share_common_settings');
+  variable_del('baidu_share_share_settings');
+  variable_del('baidu_share_image_settings');
+  variable_del('baidu_share_selectShare_settings');
+  variable_del('baidu_share_slide_settings');
+}

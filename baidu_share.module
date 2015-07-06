@@ -1,0 +1,261 @@
+<?php
+/**
+ * @file
+ * Main module file for the Baidu Share Module
+ */
+
+
+/**
+ * Implements hook_premission().
+ * Permissions for Baidu Sharebutton
+ */
+function baidu_share_permission() {
+  return array(
+    'administer Baidu Share button' => array(
+      'title' => t('Administer Baidu Share button'),
+    ),
+    'view Baidu Share button' => array(
+      'title' => t('View Baidu Share button'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().
+ */
+function baidu_share_menu() {
+    $items['admin/config/user-interface/baidushare/page'] = array(
+      'type'=> MENU_NORMAL_ITEM,
+      'title'            => 'Baidu Share Button for pages',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_global_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+    );
+
+    $items['admin/config/user-interface/baidushare/page/global'] = array(
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'title'            => 'Global',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_global_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+      'weight'           => 0,
+    );
+
+    $items['admin/config/user-interface/baidushare/page/share'] = array(
+      'type' => MENU_LOCAL_TASK,
+      'title'            => 'Share Buttons',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_share_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+      'weight'           => 1,
+    );
+
+    $items['admin/config/user-interface/baidushare/page/slide'] = array(
+      'type' => MENU_LOCAL_TASK,
+      'title'            => 'Slide Share',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_slide_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+      'weight'           => 2,
+    );
+
+    $items['admin/config/user-interface/baidushare/page/image'] = array(
+      'type' => MENU_LOCAL_TASK,
+      'title'            => 'Image Share',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_image_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+      'weight'           => 3,
+    );
+
+    $items['admin/config/user-interface/baidushare/page/select'] = array(
+      'type' => MENU_LOCAL_TASK,
+      'title'            => 'Select Text Share',
+      'description'      => 'Configure Baidu Share Button settings for pages',
+      'page callback'    => 'drupal_get_form',
+      'page arguments'   => array('baidu_share_page_select_settings'),
+      'access arguments' => array('Administer Baidu Share button'),
+      'file'             => 'baidu_share.admin.inc',
+      'weight'           => 4,
+    );
+  
+    return $items;
+}
+
+/**
+ * Implements hook_preprocess_page().
+ */
+function baidu_share_preprocess_page(&$variables) {
+  
+}
+
+
+/**
+ * Implements hook_preprocess_node().
+ */
+function baidu_share_preprocess_node(&$variables) {
+  $node_type = $variables['type'];
+  _create_baidu_share_script($node_type);
+
+}
+
+
+/**
+ * Implements hook_field_extra_fields();
+ */
+function baidu_share_field_extra_fields() {
+  $extra = array();
+  $global_settings = variable_get('baidu_share_global_settings', array());
+  $share_settings = variable_get('baidu_share_share_settings', array());
+
+  if (!empty($global_settings['enabledComponents']['share']) && !empty($share_settings!=null)) {
+    foreach ($share_settings['node_types'] as $key => $value) {
+      if ($value != null ) {
+        $extra['node'][$key]['display'] = array(
+          'baidu_share_buttons' => array(
+            'label'=>t('Baidu share button'),
+            'description' => t('generate necessary html markup for baidu share buttons'),
+            'weight' => 0,
+          ),
+        );
+      }
+    }
+  }
+
+  return $extra;
+}
+
+
+/**
+ * Implements hook_node_view_alter() 
+ */
+function baidu_share_node_view_alter(&$build) {
+
+  $display = field_extra_fields_get_display($build['#entity_type'],$build['#bundle'],$build['#view_mode']);
+
+  if (isset($display['baidu_share_buttons']) && $display['baidu_share_buttons']['visible'] == TRUE) {
+
+    $build['baidu_share_buttons'] = array(
+      '#weight' => $display['baidu_share_buttons']['weight'],
+      "#markup" => _create_baidu_share_html(),
+    );
+  }
+  
+  
+}
+
+
+/**
+ * generate html code for baidu share buttons;
+ * @return $html
+ */
+function _create_baidu_share_html() {
+  $share_settings = variable_get('baidu_share_share_settings', array());
+  $global_settings = variable_get('baidu_share_global_settings', array());
+
+  if (empty($global_settings['default_buttons'])) {
+    $global_settings['default_buttons'] = _get_default_baidu_share_buttons();
+  }
+
+  if ($share_settings['list'] != null) {
+    $button_list = str_replace("'", '"', $share_settings['list']);
+  } else {
+    $button_list = str_replace("'", '"', $global_settings['default_buttons']);
+  } 
+  
+  $html = "<div class=\"bdsharebuttonbox\" data-tag=\"share_1\">";
+  $buttons = json_decode($button_list);
+  foreach ($buttons as $value) {
+    $html .="<a class=\"bds_".$value."\" data-cmd=\"".$value."\"></a>";
+  }
+
+  if ($share_settings['more'] == "on") {
+    $html .= "<a class=\"bds_more\" data-cmd=\"more\"></a>";
+  }
+  if ($share_settings['count'] == "on") {
+    $html .= "<a class=\"bds_count\" data-cmd=\"count\"></a>";
+  }
+  $html .="</div>";
+  return $html;
+  
+}
+
+function _create_baidu_share_script($node_type) {
+
+  $global_settings = variable_get('baidu_share_global_settings', array());
+
+  if (empty($global_settings['default_buttons'])) {
+    $global_settings['default_buttons'] = _get_default_baidu_share_buttons();
+  }
+
+
+  $settings = array();
+
+
+  if (!empty($global_settings) && isset($global_settings['enabledComponents'])) {
+    foreach($global_settings['enabledComponents'] as $key => $value) {
+      if ($value != null) {
+        $tmp = variable_get('baidu_share_'.$key.'_settings', array());
+        if (!empty($tmp) && !empty($tmp['node_types'][$node_type])) {
+          unset($tmp['node_types']);
+
+          //modify vars to get ready for json encode;
+          switch ($key) {
+            case 'share':
+              unset($tmp['list']);
+              unset($tmp['more']);
+              unset($tmp['count']);
+              break;
+            case 'image':
+              $list = str_replace("'", '"', $tmp['viewList']);
+              $tmp['viewList'] = json_decode($list);
+              break;
+            case 'selectShare':
+              if (!empty($tmp['bdSelectMiniList'])) {
+                $list = str_replace("'", '"', $tmp['bdSelectMiniList']);
+              }  else {
+                $list = str_replace("'", '"', $global_settings['default_buttons']);
+              }
+              $tmp['bdSelectMiniList'] = json_decode($list);
+              break;
+            default:
+              // code...
+              break;
+          }
+
+          $settings[$key] = $tmp;
+        }
+      }
+    }
+  }
+
+  if (!empty($settings)) {
+    $common_settings = variable_get('baidu_share_common_settings', array());
+
+    $settings = array_merge(array('common'=>$common_settings), $settings);
+
+    $options = "window._bd_share_config = " . json_encode($settings). ";";
+
+    $base = "with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?cdnversion='+~(-new Date()/36e5)];";
+
+    $script = $options . $base;
+
+    drupal_add_js($script, array('scope'=>'footer', 'group'=>'JS_DEFAULT', 'type'=>'inline'));
+  }  
+
+}
+
+
+function _get_default_baidu_share_buttons() {
+  return "['qzone','tsina','huaban','tqq','renren']";
+}
